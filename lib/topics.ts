@@ -1,0 +1,48 @@
+export const topics = [
+  "kehidupan sehari-hari",
+  "hubungan dan percintaan",
+  "persahabatan",
+  "karir dan pekerjaan",
+  "kuliah dan sekolah",
+  "makanan dan kuliner Indonesia",
+  "kebiasaan unik orang Indonesia",
+  "media sosial dan internet",
+  "teknologi dan gadget",
+  "uang dan keuangan",
+  "self-improvement",
+  "mental health",
+  "keluarga",
+  "masa kecil dan nostalgia",
+  "musik dan film",
+  "budaya pop Indonesia",
+  "K-pop dan K-drama",
+  "gaming",
+  "traveling dan liburan",
+  "Jakarta vs daerah",
+  "kost-kostan dan anak rantau",
+  "overthinking dan insecurities",
+  "toxic traits dan red flags",
+  "hot takes dan unpopular opinions",
+  "dilema moral",
+  "would you rather",
+  "mitos dan kepercayaan",
+  "jajan dan street food",
+  "olahraga",
+  "hewan peliharaan",
+  "quarter life crisis",
+  "impian dan cita-cita",
+  "kebiasaan buruk yang susah dihilangkan",
+  "hal-hal receh tapi bikin kesel",
+  "pengalaman memalukan",
+  "fenomena sosial di Indonesia",
+  "bahasa gaul dan slang",
+  "generasi milenial vs gen Z",
+  "drama kantor dan teman kerja",
+  "belanja online dan e-commerce",
+] as const;
+
+export type Topic = (typeof topics)[number];
+
+export function getRandomTopic(): string {
+  return topics[Math.floor(Math.random() * topics.length)];
+}
