@@ -20,6 +20,10 @@ export default async function DashboardPage() {
             </p>
           </div>
           <div className="flex items-center gap-2">
+            <Link href="/soal"
+              className="rounded-lg border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-200 hover:bg-zinc-800">
+              Generator Soal
+            </Link>
             <Link href="/dashboard/accounts/new"
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500">
               + New account
