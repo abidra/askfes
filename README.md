@@ -1,36 +1,55 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# askfes — multi-account X auto-poster
 
-## Getting Started
+A Next.js dashboard that auto-generates and posts questions to multiple X/Twitter
+accounts via IFTTT. Each account has its own AI persona, topic list, IFTTT
+credentials, and posting interval. Tweets are generated with Google Gemini and
+delivered through IFTTT Webhooks; a Vercel cron job drives the schedule.
 
-First, run the development server:
+## Stack
+- Next.js 16 (App Router) on Vercel
+- Neon Postgres (`@neondatabase/serverless`)
+- Google Gemini (`gemini-2.5-flash`)
+- IFTTT Maker Webhooks → X
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+## Setup
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+1. Install deps:
+   ```bash
+   npm install
+   ```
+2. Copy `.env.example` → `.env.local` and fill in:
+   - `DATABASE_URL` — Neon connection string
+   - `GEMINI_API_KEY` — https://aistudio.google.com/apikey
+   - `DASHBOARD_PASSWORD` — password for the dashboard login
+   - `AUTH_SECRET` — any long random string (signs the session cookie)
+   - `CRON_SECRET` — bearer token Vercel sends to the cron endpoint
+3. Create the tables and (optionally) seed the first account:
+   ```bash
+   npm run db:migrate
+   npm run db:seed     # seeds an "askfes" account from IFTTT_* env vars, if set
+   ```
+4. Run locally:
+   ```bash
+   npm run dev
+   ```
+   Visit http://localhost:3000 → redirects to `/dashboard` (login required).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How it works
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- **Accounts** live in the `accounts` table. Manage them in the dashboard:
+  name, handle, IFTTT webhook key + event name, post prefix (e.g. `ask! `),
+  system prompt, topic list, posting interval, and an enabled toggle.
+- **Cron** (`/api/cron/tweet`, scheduled in `vercel.json`) runs on a fixed
+  schedule. Each run it posts for every *enabled* account whose interval has
+  elapsed since `last_posted_at`, logging each attempt to the `posts` table.
+- **Test now** on each dashboard card generates + posts immediately.
 
-## Learn More
+## Deploy (Vercel)
 
-To learn more about Next.js, take a look at the following resources:
+Set all `.env.local` values in **Project → Settings → Environment Variables**
+(Vercel auto-injects `CRON_SECRET` for cron requests). Push to deploy.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+> **Cron note:** Vercel **Hobby** plan only runs crons ~once/day regardless of
+> the `*/20 * * * *` schedule in `vercel.json`. For true 20-minute posting you
+> need the **Pro** plan, or move the cron to an external scheduler hitting
+> `/api/cron/tweet` with the `Authorization: Bearer $CRON_SECRET` header.

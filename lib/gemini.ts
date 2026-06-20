@@ -1,30 +1,26 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { getRandomTopic } from "./topics";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-const SYSTEM_PROMPT = `Kamu adalah akun X/Twitter @askfes yang terkenal karena pertanyaan-pertanyaan receh tapi bikin mikir.
+export type GenerateInput = {
+  systemPrompt: string;
+  topics: string[];
+  prefix: string;
+};
 
-FORMAT:
-- Setiap tweet HARUS diawali dengan "ask!" (huruf kecil, pakai tanda seru)
-- Setelah "ask!" langsung tulis pertanyaannya
-- Contoh: "ask! apa yg sedang kamu pikirkan?"
-- Contoh: "ask! menurut kalian mending gaji besar tapi toxic atau gaji pas-pasan tapi happy?"
+export type GenerateResult = {
+  text: string;
+  topic: string | null;
+};
 
-ATURAN:
-- Tulis SATU pertanyaan dalam Bahasa Indonesia kasual/gaul
-- Target audiens: anak muda Indonesia (Gen Z & Milenial)
-- Pertanyaan harus relatable, bikin mikir, dan orang pengen jawab/retweet
-- Pakai bahasa sehari-hari, boleh pakai kata gaul (sih, gak, emang, nggak, anjir, dll)
-- Maksimal 280 karakter (termasuk "ask!" di depan)
-- Variasi tone: lucu, filosofis, kontroversial tapi aman, nostalgia, absurd, random
-- JANGAN pakai hashtag
-- JANGAN pakai emoji kecuali sangat natural (maksimal 1)
-- JANGAN pakai label lain selain "ask!" di awal
-- Buat pertanyaan yang bikin orang pengen quote tweet atau reply`;
+function pickTopic(topics: string[]): string | null {
+  if (!topics || topics.length === 0) return null;
+  return topics[Math.floor(Math.random() * topics.length)];
+}
 
-export async function generateViralQuestion(): Promise<string> {
-  const topic = getRandomTopic();
+export async function generateViralQuestion(input: GenerateInput): Promise<GenerateResult> {
+  const topic = pickTopic(input.topics);
+  const prefix = input.prefix ?? "";
 
   const model = genAI.getGenerativeModel({
     model: "gemini-2.5-flash",
@@ -36,22 +32,25 @@ export async function generateViralQuestion(): Promise<string> {
     },
   });
 
+  const userPrompt = topic
+    ? `Buat satu pertanyaan viral tentang topik: "${topic}". Langsung tulis pertanyaannya saja.`
+    : `Buat satu pertanyaan viral. Langsung tulis pertanyaannya saja.`;
+
   const result = await model.generateContent([
-    { text: SYSTEM_PROMPT },
-    {
-      text: `Buat satu pertanyaan viral tentang topik: "${topic}". Ingat, langsung tulis pertanyaannya saja.`,
-    },
+    { text: input.systemPrompt },
+    { text: userPrompt },
   ]);
 
   let text = result.response.text().trim();
 
-  if (!text.toLowerCase().startsWith("ask!")) {
-    text = `ask! ${text}`;
+  // Ensure the configured prefix (e.g. "ask! ") is present exactly once.
+  if (prefix && !text.toLowerCase().startsWith(prefix.trim().toLowerCase())) {
+    text = `${prefix}${text}`;
   }
 
   if (text.length > 280) {
-    return text.slice(0, 277) + "...";
+    text = text.slice(0, 277) + "...";
   }
 
-  return text;
+  return { text, topic };
 }

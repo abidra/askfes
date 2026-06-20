@@ -1,36 +1,36 @@
 import { NextResponse } from "next/server";
-import { generateViralQuestion } from "@/lib/gemini";
-import { postToIFTTT } from "@/lib/ifttt";
+import { sql, Account } from "@/lib/db";
+import { generateAndPost } from "@/lib/post";
 
+// Runs on the Vercel cron schedule. Each tick, post for every enabled account
+// whose interval has elapsed since last_posted_at.
 export async function GET(request: Request) {
   const authHeader = request.headers.get("authorization");
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  try {
-    const tweet = await generateViralQuestion();
-    const iftttResult = await postToIFTTT(tweet);
+  // Due = never posted, or (now - last_posted_at) >= interval_minutes.
+  const due = (await sql`
+    SELECT * FROM accounts
+    WHERE enabled = true
+      AND (
+        last_posted_at IS NULL
+        OR last_posted_at <= now() - (interval_minutes * interval '1 minute')
+      )
+    ORDER BY id ASC`) as Account[];
 
-    if (!iftttResult.ok) {
-      return NextResponse.json(
-        {
-          error: "IFTTT webhook failed",
-          status: iftttResult.status,
-          body: iftttResult.body,
-          tweet,
-        },
-        { status: 502 }
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      tweet,
-      ifttt: { status: iftttResult.status },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    return NextResponse.json({ error: message }, { status: 500 });
+  if (due.length === 0) {
+    return NextResponse.json({ success: true, posted: 0, results: [] });
   }
+
+  // Run accounts sequentially to keep within serverless limits and avoid
+  // hammering the Gemini API; volume is low (a handful of accounts).
+  const results = [];
+  for (const account of due) {
+    results.push(await generateAndPost(account));
+  }
+
+  const posted = results.filter((r) => r.ok).length;
+  return NextResponse.json({ success: true, posted, total: due.length, results });
 }
